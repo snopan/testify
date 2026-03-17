@@ -171,8 +171,7 @@ func TestObjectsAreEqualValues(t *testing.T) {
 		{complex128(1e+10 + 1e+10i), complex64(1e+10 + 1e+10i), true},
 		{complex64(1e+10 + 1e+10i), complex128(1e+10 + 1e+10i), true},
 
-		// cases for float32/float64 comparison, which should not be equal due to precision differences
-		{float32(1.0 / 3.0), float64(1.0 / 3.0), false},
+		{float32(1.0 / 3.0), float64(1.0 / 3.0), true},
 
 		// cases for float32/float64 comparison, which should be equal within float32 precision
 		{float32(10.1), float64(10.1), true},

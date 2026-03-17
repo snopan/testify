@@ -176,40 +176,57 @@ func ObjectsAreEqualValues(expected, actual interface{}) bool {
 	if !expectedType.ConvertibleTo(actualType) {
 		return false
 	}
+	expectedValueCmp := expectedValue.Convert(actualType).Interface()
+	actualValueCmp := actual
 
 	if !isNumericType(expectedType) || !isNumericType(actualType) {
 		// Attempt comparison after type conversion
 		return reflect.DeepEqual(
-			expectedValue.Convert(actualType).Interface(), actual,
+			expectedValueCmp, actualValueCmp,
 		)
 	}
 
-	// If BOTH values are numeric, there are chances of false positives due
-	// to overflow or underflow. So, we need to make sure to always convert
-	// the smaller type to a larger type before comparing.
-	fromType := actualType
-	toType := expectedType
-	fromValue := actualValue
-	toValue := expectedValue
-	if expectedType.Size() < actualType.Size() {
-		fromType = expectedType
-		toType = actualType
-		fromValue = expectedValue
-		toValue = actualValue
+	if actual != actual || expected != expected {
+		// NaN is not equal to NaN
+		return false
 	}
 
-	// If we are converting from float32 to float64, the converted value will
-	// have trailing non zero decimals due to binary representation differences
-	// For example: float64(float32(10.1)) = 10.100000381469727
-	// To remove the trailing decimals we can round the 64-bit value to
-	// expected precision of 32-bit which is 6 decimal places
-	newValue := fromValue.Convert(toType).Interface()
-	if fromType.Kind() == reflect.Float32 && toType.Kind() == reflect.Float64 {
-		scale := math.Pow(10, 6)
-		newValue = math.Round(newValue.(float64)*scale) / scale
+	// Both are numeric but their types are different, otherwise ObjectsAreEqual would have returned true already.
+	// We need to convert the smaller type to the larger type and then compare.
+
+	smallestTypeValue, largestTypeValue := expectedValue, actualValue
+	if actualType.Size() < expectedType.Size() {
+		smallestTypeValue, largestTypeValue = largestTypeValue, smallestTypeValue
+
+		if !actualType.ConvertibleTo(expectedType) {
+			return false
+		}
+		actualValueCmp = actualValue.Convert(expectedType).Interface()
+		expectedValueCmp = expected
 	}
 
-	return newValue == toValue.Interface()
+	if actualValueCmp == expectedValueCmp {
+		// fast path
+		return true
+	}
+
+	if smallestTypeValue.Kind() == reflect.Float32 && largestTypeValue.Kind() == reflect.Float64 {
+		a, b := expected, actual
+		if af, aIsNumber := toFloat(expected); aIsNumber && af == 0 {
+			// avoid division by zero in calcRelativeError
+			a, b = b, a
+		}
+
+		epsilon, err := calcRelativeError(a, b)
+		if err != nil {
+			return false
+		}
+
+		// The threshold of 1e-6 is somewhat arbitrary, but it is a common choice for comparing floating point numbers.
+		return epsilon <= 1e-6
+	}
+
+	return false
 }
 
 // isNumericType returns true if the type is one of:
