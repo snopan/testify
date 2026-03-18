@@ -170,6 +170,23 @@ func TestObjectsAreEqualValues(t *testing.T) {
 		{float32(10.123456), float64(10.12345600), true},
 		{float32(10.123456), float64(10.12345678), false},
 		{float32(1.0 / 3.0), float64(1.0 / 3.0), false},
+
+		// Something near overflow should work
+		{float32(math.MaxFloat32), float64(math.MaxFloat32), true},
+
+		// NaN should remain unequal, even across float32/float64.
+		{float32(math.NaN()), float64(math.NaN()), false},
+
+		// Infinity should compare like ordinary equality.
+		{float32(math.Inf(1)), float64(math.Inf(1)), true},
+		{float32(math.Inf(-1)), float64(math.Inf(-1)), true},
+		{float64(math.Inf(1)), float32(math.Inf(-1)), false},
+
+		// zero should not lead to division by zero error
+		{float32(0), float64(0), true},
+
+		// Signed zero should still compare equal.
+		{float32(math.Copysign(0, -1)), float64(0), true},
 	}
 
 	for _, c := range cases {
